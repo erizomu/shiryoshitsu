@@ -1,14 +1,14 @@
 # 実装・検証記録（2026-11-03実装／2026-11-04追記）
 
-本書は公開承認前に実施したローカル検証の記録です。その後、ユーザーから作業ブランチへの反映・PR作成・CI確認の承認を得ています。公開後の進捗とCI結果はGitHubのPRおよびActionsを参照してください。マージ・定期収集・外部公開は別途承認の対象です。
+本書は2026-11-03の公開承認前のローカル検証と、2026-11-04の追加確認・公開作業の記録です。ユーザー承認を得て作業ブランチをpushし、[PR #1](https://github.com/erizomu/shiryoshitsu/pull/1)を作成しました。CIの最新結果は[PRのChecks](https://github.com/erizomu/shiryoshitsu/pull/1/checks)および[Actions](https://github.com/erizomu/shiryoshitsu/actions)を参照してください。マージ・定期収集・外部公開は別途承認の対象です。
 
 ## 対象と作業状態
 
 - 対象：既存の公開リポジトリ `erizomu/shiryoshitsu`。
 - 基準：`main` の `d1af979e6374244f833ad2d792a21d602db0b134`（READMEのみ）。
 - 提供された `shiryoshitsu_codex_handoff_2026-11-03.zip` 内の実装をベースに修正。新規に作り直したものではありません。
-- ローカル作業ブランチ：`codex/history-collection-mvp`。この検証記録作成時点では、コミット・push・PR・マージ・公開・定期実行は未実施でした。
-- 実行環境：Windows、Python 3.12.14、標準ライブラリのみ。Python 3.11／3.13とUbuntuでの実行は、承認後のCIで確認予定です。
+- 作業ブランチ：`codex/history-collection-mvp`。2026-11-03の初回検証時点ではコミット・push・PRは未実施でしたが、2026-11-04に作業ブランチをpushしてPR #1を作成しました。mainへのマージ、Web公開、定期実行は行っていません。
+- ローカル実行環境：Windows、Python 3.12.14、標準ライブラリのみ。Ubuntu／WindowsとPython 3.11／3.12／3.13の6環境はPRのCI対象です。本書のローカルテスト結果とCI結果は区別し、最新コミットに対する成功・失敗は上記Checksで確認してください。
 
 ## 既存実装の確認と差分
 
@@ -25,7 +25,7 @@
 | `topics.json` | 指定7テーマを維持し、中国語簡体字・異体字の検索語を追加 |
 | `.github/workflows/tests.yml` | Ubuntu／Windows × Python 3.11／3.12／3.13のオフラインテスト。公式Actions v6のSHAを固定。scheduleなし |
 
-GitHub側にはREADMEのみだったため、公開予定差分はREADMEの置換と実装・設定・テスト・文書の追加です。引き継ぎZIPにあった `AGENTS.md`・`CODEX_TASK.md` も保持しています。
+基準のmainにはREADMEのみだったため、PRの差分はREADMEの置換と実装・設定・テスト・文書の追加です。引き継ぎZIPにあった `AGENTS.md`・`CODEX_TASK.md` も保持しています。
 
 ## オフライン自動テスト
 
@@ -34,6 +34,8 @@ python -m unittest discover -s tests -v
 ```
 
 **71テスト成功（失敗・エラー0件）。** 通信・待機はモック化し、Webもソケットを開かずメモリ上のHTTP要求で検証しています。テストの架空書誌には実際の収集データを使っていません。
+
+初回CIではUbuntuの3環境が成功し、Windowsの3環境でテスト内の日本語メッセージ出力がcp1252により失敗しました。エクスポートテストで標準出力を捕捉して内容も検証する形に修正し、ローカルでも`PYTHONIOENCODING=cp1252`で71テストの成功を確認しました。最終コミットのCI結果は上記PRのChecksを参照してください。
 
 検証範囲は3機関のXML、正常0件、APIエラー、不正XML、UTF-16等のDTD／実体宣言、DOI一致、DOIなし一致、異なるDOI、曖昧な候補、日本語検索、移行と履歴保存、CSV／JSON、CLIの失敗継続と秘密値除去、Webの検索・エスケープ・公開アドレス拒否です。
 
@@ -76,18 +78,18 @@ python -m shiryoshitsu --db data/api-smoke.db export --format csv --out exports/
 python -m shiryoshitsu --db data/api-smoke.db export --format json --out exports/api-smoke.json
 ```
 
-DB、実収集データ、CSV／JSON、診断ログはGitの除外対象であることを確認しました。配布ZIP・公開予定の差分には含めません。`git diff --check`も成功しています。
+DB、実収集データ、CSV／JSON、診断ログはGitの除外対象であることを確認しました。配布ZIP・PRの差分には含めていません。`git diff --check`も成功しています。
 
-## 残課題と公開前の承認
+## 公開作業の経過と残課題
 
 - CiNiiの少量実通信は2026-11-04に成功しました。別のターミナルで利用する際は、環境変数`CINII_APP_ID`を再設定してください。
-- GitHub Actionsは設定のみ。承認後の作業ブランチpush／PRで6環境の成功を確認します。
-- 2026-11-04の公開再試行でも、GitHub連携は書き込み時に403、PC側Gitは認証情報なしの状態でした。ローカルコミットは作成済みですが、push・PR作成・CI実行は未実施です。
+- GitHub Actionsは作業ブランチのpush／PRにより開始されました。6環境の最新結果は[PRのChecks](https://github.com/erizomu/shiryoshitsu/pull/1/checks)で確認してください。本書では実行中のCIを成功扱いにしていません。
+- 2026-11-04の当初の公開試行では、GitHub連携の書き込みが403となり、PC側Gitにも認証情報がありませんでした。その後、ユーザーがGit Credential Managerのログインを完了し、Git認証が成功しました。作業ブランチのpushと[PR #1](https://github.com/erizomu/shiryoshitsu/pull/1)の作成は完了しています。
 - 各検索語につき先頭1〜100件を取得する初期版です。ページ巡回・差分取得・研究分野の自動判定は未実装です。
 - 旧版で失われた検索履歴や過去の誤統合は自動復元できません。移行前にDBをバックアップしてください。
 - 定期収集とデータ永続化はREADMEに将来の方法・制約を記載しただけで、有効化していません。
 - 公開準備時にJ-STAGE規約を再確認し、リンク付きクレジットと利用規約リンク、サーバ・クラウド等での24時間以上の保存制限を反映しました。本実装は保存期限を自動管理しないため、J-STAGE収集DBをそのままクラウドへ永続化する用途には使えません。
 
-公開予定は既存の公開GitHubリポジトリ `erizomu/shiryoshitsu` の作業ブランチとPRです。追加の有料サービスや支払設定は不要で、標準GitHub-hosted runnerによる公開リポジトリのテストは無料です（公式料金へのリンクはREADME参照）。ローカル運用の電気・通信・ディスク等は利用者の環境に依存します。
+公開先は既存の公開GitHubリポジトリ `erizomu/shiryoshitsu` の作業ブランチとPR #1です。追加の有料サービスや支払設定は不要で、標準GitHub-hosted runnerによる公開リポジトリのテストは無料です（公式料金へのリンクはREADME参照）。ローカル運用の電気・通信・ディスク等は利用者の環境に依存します。
 
-作業ブランチへの反映・PR作成・CI確認はユーザー承認済みです。GitHub書き込み認証の設定後に再開します。mainは直接更新せず、マージ・定期実行・デプロイは別途確認します。
+作業ブランチへの反映・PR作成・CI確認はユーザー承認済みで、認証待ちは解消しています。mainは直接更新していません。マージ・定期実行・デプロイは別途確認します。

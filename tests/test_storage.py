@@ -81,10 +81,14 @@ class StorageTests(unittest.TestCase):
     def test_export_csv_and_json(self):
         self.lib.add(item(), topic="魏晋")
         out = Path(self.temp.name) / "data.csv"
-        cli._export(self.lib.search(), "csv", str(out))
+        with contextlib.redirect_stdout(io.StringIO()) as csv_message:
+            cli._export(self.lib.search(), "csv", str(out))
+        self.assertIn("書き出しました", csv_message.getvalue())
         self.assertTrue(out.read_bytes().startswith(b"\xef\xbb\xbf"))
         out2 = Path(self.temp.name) / "data.json"
-        cli._export(self.lib.search(), "json", str(out2))
+        with contextlib.redirect_stdout(io.StringIO()) as json_message:
+            cli._export(self.lib.search(), "json", str(out2))
+        self.assertIn("書き出しました", json_message.getvalue())
         self.assertEqual(json.loads(out2.read_text(encoding="utf-8"))[0]["title"], "鄧艾の政策研究")
 
 
