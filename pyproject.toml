@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=65"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shiryoshitsu"
+version = "0.1.0"
+description = "日本史・中国史研究向けの書誌API収集、重複排除、ローカル検索"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+shiryoshitsu = "shiryoshitsu.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["shiryoshitsu*"]
