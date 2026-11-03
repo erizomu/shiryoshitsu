@@ -1,0 +1,24 @@
+# 収集データと認証情報は、公開リポジトリに置かない
+.env
+.env.*
+!.env.example
+data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite*
+*.log
+logs/
+exports/
+*.pem
+*.key
+*.p12
+*.pfx
+__pycache__/
+.pytest_cache/
+*.py[cod]
+.venv/
+build/
+dist/
+*.egg-info/
+.DS_Store
