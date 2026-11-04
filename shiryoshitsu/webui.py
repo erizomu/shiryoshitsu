@@ -40,15 +40,26 @@ def _result_card(item: dict) -> str:
             f'<div class="meta">{("DOI: " + doi) if doi else ""}</div></article>')
 
 
-def render(library: Library, query: str = "") -> str:
-    items = library.search(query, limit=200)
+def render(library: Library, query: str = "", *, new_only: bool = False) -> str:
+    from .operations import recent, status_summary
+    items = recent(library, 7, query)[:200] if new_only else library.search(query, limit=200)
     stats = library.stats()
+    status = status_summary(library)
+    panel = ""
+    if status:
+        labels = {None: "実行中／前回中断", 0: "正常", 1: "失敗", 2: "一部失敗・取得上限あり"}
+        issues = [d for d in status["details"] if d.get("status") != "ok"]
+        issue_text = " / ".join(dict.fromkeys(f"{d.get('provider', '')} {d.get('scope', '')}: {d.get('message', '')}" for d in issues))
+        panel = (f'<section class="card">前回収集: {escape(status["started_at"])}（UTC） / '
+                 f'{labels.get(status["status"], "不明")} / 新規書誌 {status["new_count"]}件<br>'
+                 f'最終バックアップ: {escape(status["last_backup"])}（UTC）<br>{escape(issue_text)}</section>')
     body = "\n".join(_result_card(item) for item in items) if items else '<p>一致する書誌はありません。</p>'
+    new_filter = '<input type="hidden" name="new" value="1">' if new_only else ''
     return f"""<!doctype html><html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>史料室 | 書誌検索</title>
 <style>{CSS}</style></head><body><header><h1>史料室 — 文献・史料目録</h1>
 <small>{stats['items']}件の書誌・{stats['sources']}件の出典。本文やPDFを保存するシステムではありません。</small></header>
-<main><form action="/" method="get"><input name="q" type="search" value="{escape(query, quote=True)}" placeholder="姜維、松下之綱、山科言継…" aria-label="書誌を検索">
+<main>{panel}<p><a href="/?new=1">最近7日で初めて取得した書誌</a> / <a href="/">全書誌</a></p><form action="/" method="get">{new_filter}<input name="q" type="search" value="{escape(query, quote=True)}" placeholder="姜維、松下之綱、山科言継…" aria-label="書誌を検索">
 <button type="submit">検索</button></form><p>表示 {len(items)}件（最大200件）</p>{body}</main>
 <footer><a href="https://www.jstage.jst.go.jp/">Powered by J-STAGE</a>（JST提供）。
 <a href="https://www.jstage.jst.go.jp/static/pages/WebAPI/-char/ja">J-STAGE Web API利用規約</a>に従って利用してください。
@@ -105,11 +116,12 @@ def make_handler(library: Library) -> type[BaseHTTPRequestHandler]:
                 self._error(404, "ページが見つかりません。")
                 return
             try:
-                query = parse_qs(parsed.query, max_num_fields=20).get("q", [""])[0][:200]
+                params = parse_qs(parsed.query, max_num_fields=20)
+                query = params.get("q", [""])[0][:200]
             except ValueError:
                 self._error(400, "検索条件が多すぎます。")
                 return
-            data = render(library, query).encode("utf-8")
+            data = render(library, query, new_only=params.get("new") == ["1"]).encode("utf-8")
             self._respond(200, data, html=True)
 
         def _reject_method(self) -> None:

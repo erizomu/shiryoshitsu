@@ -153,6 +153,9 @@ class Library:
 
     def add(self, incoming: Bibliography, *, topic: str = "", query: str = "") -> tuple[bool, bool]:
         """戻り値は(書誌新規追加, 出典新規追加)。反復実行しても増え続けない。"""
+        managed = self.db.execute("SELECT 1 FROM sqlite_master WHERE name='operation_policy'").fetchone()
+        if managed and (not getattr(self, "_managed_write", False) or incoming.provider not in {"cinii", "ndl"}):
+            raise ValueError("自動運用DBにはdailyからだけ保存できます。J-STAGEは保存しません")
         record = incoming.validated()
         now = utcnow()
         with self.db:
