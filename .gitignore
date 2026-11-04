@@ -14,6 +14,10 @@ exports/
 *.key
 *.p12
 *.pfx
+*.dpapi
+secrets/
+backups/
+collection.lock
 __pycache__/
 .pytest_cache/
 *.py[cod]

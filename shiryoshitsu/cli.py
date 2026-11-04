@@ -74,6 +74,19 @@ def _build_parser() -> argparse.ArgumentParser:
     v = sub.add_parser("serve", help="ローカル検索画面を表示（読み取り専用）")
     v.add_argument("--host", default="127.0.0.1", help="127.0.0.1またはlocalhostのみ許可")
     v.add_argument("--port", type=int, default=8765)
+    d = sub.add_parser("daily", help="専用DBへCiNii・条件確認済みNDLを収集しバックアップ（登録はしない）")
+    d.add_argument("--config", default="topics.json")
+    d.add_argument("--data-home", help="本人専用の保存フォルダ。初期値はOSのユーザーデータ領域")
+    d.add_argument("--backup-dir", help="外付け等の追加バックアップ先（任意）")
+    d.add_argument("--force", action="store_true", help="本日実行済みでも再実行")
+    d.add_argument("--page-size", type=int, default=100)
+    d.add_argument("--pages", type=int, default=5)
+    n = sub.add_parser("recent", help="初めて取得した日で新着を表示（刊行日とは別）")
+    n.add_argument("--days", type=int, default=7)
+    sub.add_parser("status", help="自動収集の実行結果を表示")
+    j = sub.add_parser("preview", help="J-STAGEをメモリ内だけに取得して端末で一時表示")
+    j.add_argument("--query", required=True)
+    j.add_argument("--limit", type=int, default=10)
     return p
 
 
@@ -219,6 +232,24 @@ def main(argv: list[str] | None = None) -> int:
             stream.reconfigure(encoding="utf-8")
     args = _build_parser().parse_args(argv)
     try:
+        if args.command == "daily":
+            from .operations import run_daily, data_home
+            if args.db != DEFAULT_DB:
+                raise ValueError("dailyは--dbではなく--data-homeで専用保存先を指定します")
+            return run_daily(args.config, Path(args.data_home) if args.data_home else data_home(),
+                             force=args.force, pages=args.pages, page_size=args.page_size,
+                             backup_dir=Path(args.backup_dir) if args.backup_dir else None)
+        if args.command == "preview":
+            # ファイルDB・ログ・エクスポートを使わず、このプロセス終了時に破棄する。
+            with Library(":memory:") as memory:
+                code = _collect(memory, [("一時閲覧", args.query)], ["jstage"], limit=args.limit,
+                                delay=2, timeout=15, log_file="")
+                for row in memory.search(limit=None):
+                    print(f"{row['title']} / {row['url']}")
+                print("Powered by J-STAGE（JST提供） https://www.jstage.jst.go.jp/")
+                print("利用規約 https://www.jstage.jst.go.jp/static/pages/WebAPI/-char/ja")
+                print("取得情報はメモリ内のみ。端末出力をクラウドログへ保存しないでください。")
+                return code
         if args.command in ("export", "collect", "sync"):
             output = args.out if args.command == "export" else args.log_file
             database = Path(args.db).expanduser().resolve()
@@ -229,6 +260,8 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"データベースを作成しました: {args.db}")
                 return 0
             if args.command in ("collect", "sync"):
+                if library.db.execute("SELECT 1 FROM sqlite_master WHERE name='operation_policy'").fetchone():
+                    raise ValueError("専用DBの収集にはdailyを使用してください。手動収集は別のDBへ保存してください")
                 tasks = [(args.topic, args.query)] if args.command == "collect" else _load_tasks(args.config)
                 return _collect(library, tasks, _sources(args.source), limit=args.limit, delay=args.delay, timeout=args.timeout, log_file=args.log_file)
             if args.command == "search":
@@ -245,6 +278,14 @@ def main(argv: list[str] | None = None) -> int:
                 return 0
             if args.command == "stats":
                 print(json.dumps(library.stats(), ensure_ascii=False, indent=2))
+                return 0
+            if args.command == "recent":
+                from .operations import recent
+                print(json.dumps(recent(library, args.days), ensure_ascii=False, indent=2))
+                return 0
+            if args.command == "status":
+                from .operations import status_summary
+                print(json.dumps(status_summary(library), ensure_ascii=False, indent=2))
                 return 0
             if args.command == "export":
                 _export(library.search(args.query, topic=args.topic, limit=None), args.format, args.out)

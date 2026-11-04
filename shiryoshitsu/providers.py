@@ -19,20 +19,31 @@ ENDPOINTS = {
 }
 
 
-def request_url(provider: str, query: str, count: int, cinii_app_id: str | None = None) -> str:
+def request_url(provider: str, query: str, count: int, cinii_app_id: str | None = None,
+                *, start: int = 1, ndl_provider: str = "", newest: bool = False) -> str:
     if not clean_text(query):
         raise ValueError("検索語は必須です")
     if isinstance(count, bool) or not isinstance(count, int) or count < 1 or count > 100:
         raise ValueError("1回あたりの取得件数は1〜100です")
+    if isinstance(start, bool) or not isinstance(start, int) or start < 1:
+        raise ValueError("開始位置は正の整数です")
     if provider == "jstage":
         # 論文タイトルの部分一致検索。本文の取得は行わない。
-        params = {"service": "3", "article": query, "start": "1", "count": count}
+        params = {"service": "3", "article": query, "start": str(start), "count": count}
     elif provider == "cinii":
         if not clean_text(cinii_app_id):
             raise ValueError("CiNii Research は CINII_APP_ID が必要です")
-        params = {"appid": cinii_app_id.strip(), "q": query, "format": "atom", "lang": "ja", "count": count, "start": 1, "sortorder": 4}
+        if start + count - 1 > 10000:
+            raise ValueError("CiNiiの取得範囲は10000件以内です")
+        params = {"appid": cinii_app_id.strip(), "q": query, "format": "atom", "lang": "ja", "count": count, "start": start, "sortorder": 0 if newest else 4}
     elif provider == "ndl":
-        params = {"any": query, "cnt": count, "idx": 1}
+        if start + count - 1 > 500:
+            raise ValueError("NDL OpenSearchの取得範囲は500件以内です")
+        params = {"any": query, "cnt": count, "idx": start}
+        if ndl_provider:
+            if ndl_provider not in {"zassaku", "zassaku-online", "iss-ndl-opac", "open"}:
+                raise ValueError("利用条件を確認済みのNDL提供元だけ指定できます")
+            params["dpid"] = ndl_provider
     else:
         raise ValueError(f"未対応の収集元: {provider}")
     return ENDPOINTS[provider] + "?" + urlencode(params)
